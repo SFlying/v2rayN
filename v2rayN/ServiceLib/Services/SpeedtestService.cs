@@ -1,3 +1,5 @@
+using NLog.Targets;
+
 namespace ServiceLib.Services;
 
 public class SpeedtestService(Config config, Func<SpeedTestResult, Task> updateFunc)
@@ -55,6 +57,10 @@ public class SpeedtestService(Config config, Func<SpeedTestResult, Task> updateF
 
             case ESpeedActionType.Mixedtest:
                 await RunMixedTestAsync(lstSelected, _config.SpeedTestItem.MixedConcurrencyCount, true, exitLoopKey);
+                break;
+
+            case ESpeedActionType.TestMe:
+                await RunTestMeAsync(lstSelected, exitLoopKey);
                 break;
         }
     }
@@ -114,6 +120,11 @@ public class SpeedtestService(Config config, Func<SpeedTestResult, Task> updateF
                     await UpdateFunc(it.IndexId, ResUI.Speedtesting, ResUI.SpeedtestingWait);
                     ProfileExManager.Instance.SetTestDelay(it.IndexId, 0);
                     ProfileExManager.Instance.SetTestSpeed(it.IndexId, 0);
+                    break;
+
+                case ESpeedActionType.TestMe:
+                    await UpdateFunc(it.IndexId, "", "", ResUI.SpeedtestingWait); // 初始化状态
+                    ProfileExManager.Instance.SetTestAvailability(it.IndexId, "");
                     break;
             }
         }
@@ -302,6 +313,177 @@ public class SpeedtestService(Config config, Func<SpeedTestResult, Task> updateF
         await Task.WhenAll(tasks);
     }
 
+    private async Task RunTestMeAsync(List<ServerTestItem> lstSelected, string exitLoopKey)
+    {
+        // 1. 获取所有启用的目标
+        var enabledTargets = _config.AvailabilityTargets?.Where(x => x.IsEnabled).ToList();
+        if (enabledTargets == null || !enabledTargets.Any())
+        {
+            NoticeManager.Instance.Enqueue("未找到启用的检测目标！");
+            return;
+        }
+
+        // 2. 按页分批次测试，避免同时启动过多 Core 进程
+        int pageSize = lstSelected.Count < Global.SpeedTestPageSize ? lstSelected.Count : Global.SpeedTestPageSize;
+        var lstTest = GetTestBatchItem(lstSelected, pageSize);
+
+        foreach (var batch in lstTest)
+        {
+            if (ShouldStopTest(exitLoopKey))
+            {
+                return;
+            }
+
+            ProcessService processService = null;
+            try
+            {
+                // 3. 为当前批次启动本地代理 Core
+                processService = await CoreManager.Instance.LoadCoreConfigSpeedtest(batch);
+                if (processService is null)
+                {
+                    foreach (var it in batch)
+                    {
+                        ProfileExManager.Instance.SetTestAvailability(it.IndexId, "Core Error");
+                        await UpdateFunc(it.IndexId, "", "", "Core Error");
+                    }
+                    continue;
+                }
+
+                // 给 Core 一点启动时间
+                await Task.Delay(1000);
+
+                List<Task> tasks = new();
+                foreach (var it in batch)
+                {
+                    if (!it.AllowTest)
+                    {
+                        continue;
+                    }
+
+                    if (ShouldStopTest(exitLoopKey))
+                    {
+                        return;
+                    }
+
+                    tasks.Add(Task.Run(async () =>
+                    {
+                        var successList = new List<string>();
+                        var handler = new SocketsHttpHandler
+                        {
+                            Proxy = new WebProxy($"socks5://{Global.Loopback}:{it.Port}"),
+                            UseProxy = true,
+                            PooledConnectionLifetime = TimeSpan.FromSeconds(5)
+                        };
+                        var ua = enabledTargets.FirstOrDefault(t => !string.IsNullOrEmpty(t.UserAgent))?.UserAgent;
+                        using var client = new HttpClient(handler);
+                        client.Timeout = TimeSpan.FromSeconds(_config.SpeedTestItem.SpeedTestTimeout > 0 ? _config.SpeedTestItem.SpeedTestTimeout : 5);
+                        client.DefaultRequestHeaders.Add("User-Agent", string.IsNullOrEmpty(ua) ? "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" : ua);
+                        client.DefaultRequestHeaders.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+                        client.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.5");
+                        foreach (var target in enabledTargets)
+                        {
+                            try
+                            {
+                                var response = await client.GetAsync(target.TestUrl);
+                                if (response.IsSuccessStatusCode)
+                                {
+                                    var content = await response.Content.ReadAsStringAsync();
+                                    Debug.WriteLine($"---{target.DestinationName}---");
+                                    Debug.WriteLine(content);
+                                    Debug.WriteLine($"---结束---\r\n");
+                                    if (string.IsNullOrEmpty(target.SuccessKeywords) || content.Contains(target.SuccessKeywords))
+                                    {
+                                        successList.Add(target.DestinationName);
+                                    }
+                                }
+                            }
+                            catch { }
+                        }
+                        string resultStr = successList.Count > 0 ? string.Join(", ", successList) : "Fail";
+
+                        //ProfileExManager.Instance.SetTestAvailability(it.IndexId, resultStr);
+                        //await UpdateFunc(it.IndexId, "", "", resultStr);
+                        //string resultStr = "Fail";
+                        //try
+                        //{
+                        //    // 4. 配置 HttpClient 并绑定当前节点的本地代理端口
+                        //    var handler = new SocketsHttpHandler
+                        //    {
+                        //        Proxy = new WebProxy($"socks5://{Global.Loopback}:{it.Port}"),
+                        //        UseProxy = true,
+                        //        PooledConnectionLifetime = TimeSpan.FromSeconds(5)
+                        //    };
+
+                        //    using var client = new HttpClient(handler);
+                        //    // 使用配置中的超时时间，默认给 10 秒
+                        //    client.Timeout = TimeSpan.FromSeconds(_config.SpeedTestItem.SpeedTestTimeout > 0 ? _config.SpeedTestItem.SpeedTestTimeout : 10);
+
+                        //    // 5. 添加请求头，伪装真实浏览器以绕过基础的 WAF 拦截
+                        //    client.DefaultRequestHeaders.Add("User-Agent", string.IsNullOrEmpty(target.UserAgent) ? "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" : target.UserAgent);
+                        //    client.DefaultRequestHeaders.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+                        //    client.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.5");
+
+                        //    // 6. 发起真实请求并获取网页内容
+                        //    var response = await client.GetAsync(target.TestUrl);
+
+                        //    if (response.IsSuccessStatusCode)
+                        //    {
+                        //        var content = await response.Content.ReadAsStringAsync();
+                        //        Debug.WriteLine(content);
+                        //        // 7. 判断关键字匹配
+                        //        if (string.IsNullOrEmpty(target.SuccessKeywords))
+                        //        {
+                        //            resultStr = "OK"; // 如果未配置关键字，状态码 200 即视为可用
+                        //        }
+                        //        else if (content.Contains(target.SuccessKeywords))
+                        //        {
+                        //            resultStr = target.DestinationName; // 例如显示 "Gemini"
+                        //        }
+                        //        else
+                        //        {
+                        //            resultStr = "Unsupported Region"; // 状态码对，但关键字没匹配上（例如被重定向到了不支持区域页面）
+                        //        }
+                        //    }
+                        //    else
+                        //    {
+                        //        // 记录 HTTP 错误状态码（如 403 代表可能被 CF 拦截）
+                        //        resultStr = $"HTTP {(int)response.StatusCode}";
+                        //    }
+                        //}
+                        //catch (TaskCanceledException)
+                        //{
+                        //    resultStr = "Timeout";
+                        //}
+                        //catch (Exception ex)
+                        //{
+                        //    resultStr = "Error";
+                        //    Logging.SaveLog(_tag, ex);
+                        //}
+
+                        // 8. 写入底层管理类并刷新 UI (注意这里假设你已经给 UpdateFunc 加了第四个参数处理 Availability)
+                        ProfileExManager.Instance.SetTestAvailability(it.IndexId, resultStr);
+                        await UpdateFunc(it.IndexId, "", "", resultStr);
+                    }));
+                }
+
+                await Task.WhenAll(tasks);
+            }
+            catch (Exception ex)
+            {
+                Logging.SaveLog(_tag, ex);
+            }
+            finally
+            {
+                // 9. 释放临时 Core
+                if (processService != null)
+                {
+                    await processService.StopAsync();
+                }
+            }
+            await Task.Delay(100);
+        }
+    }
+
     private async Task<int> DoRealPing(ServerTestItem it)
     {
         var webProxy = new WebProxy($"socks5://{Global.Loopback}:{it.Port}");
@@ -378,9 +560,9 @@ public class SpeedtestService(Config config, Func<SpeedTestResult, Task> updateF
         return lstTest;
     }
 
-    private async Task UpdateFunc(string indexId, string delay, string speed = "")
+    private async Task UpdateFunc(string indexId, string delay, string speed = "", string availability = "")
     {
-        await _updateFunc?.Invoke(new() { IndexId = indexId, Delay = delay, Speed = speed });
+        await _updateFunc?.Invoke(new() { IndexId = indexId, Delay = delay, Speed = speed, Availability = availability });
         if (indexId.IsNotEmpty() && speed.IsNotEmpty())
         {
             ProfileExManager.Instance.SetTestMessage(indexId, speed);

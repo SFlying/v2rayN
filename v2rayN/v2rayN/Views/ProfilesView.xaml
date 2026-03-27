@@ -149,6 +149,11 @@
                             Header="{x:Static resx:ResUI.menuRemoveInvalidServerResult}" />
                         <Separator />
                         <MenuItem
+                            x:Name="menuAvailabilityTest"
+                            Height="{StaticResource MenuItemHeight}"
+                            Header="可用性检测" 
+                            InputGestureText="Ctrl+G" />
+                        <MenuItem
                             x:Name="menuTcpingServer"
                             Height="{StaticResource MenuItemHeight}"
                             Header="{x:Static resx:ResUI.menuTcpingServer}"
@@ -327,6 +332,17 @@
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="{x:Type TextBlock}">
                                 <Setter Property="HorizontalAlignment" Value="Right" />
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </base:MyDGTextColumn>
+                    <base:MyDGTextColumn
+                        Width="100"
+                        Binding="{Binding Availability}"
+                        ExName="Availability"
+                        Header="可用性">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="{x:Type TextBlock}">
+                                <Setter Property="HorizontalAlignment" Value="Center" />
                             </Style>
                         </DataGridTextColumn.ElementStyle>
                     </base:MyDGTextColumn>

@@ -56,8 +56,8 @@ public class ProfilesViewModel : MyReactiveObject
     public ReactiveCommand<SubItem, Unit> MoveToGroupCmd { get; }
 
     //servers ping
+    public ReactiveCommand<Unit, Unit> AvailabilityTestCmd { get; }
     public ReactiveCommand<Unit, Unit> MixedTestServerCmd { get; }
-
     public ReactiveCommand<Unit, Unit> TcpingServerCmd { get; }
     public ReactiveCommand<Unit, Unit> RealPingServerCmd { get; }
     public ReactiveCommand<Unit, Unit> SpeedServerCmd { get; }
@@ -166,6 +166,10 @@ public class ProfilesViewModel : MyReactiveObject
         {
             await ServerSpeedtest(ESpeedActionType.FastRealping);
         });
+        AvailabilityTestCmd = ReactiveCommand.CreateFromTask(async () =>
+        {
+            await ServerSpeedtest(ESpeedActionType.TestMe);
+        }, canEditRemove);
         MixedTestServerCmd = ReactiveCommand.CreateFromTask(async () =>
         {
             await ServerSpeedtest(ESpeedActionType.Mixedtest);
@@ -292,6 +296,10 @@ public class ProfilesViewModel : MyReactiveObject
         if (result.Speed.IsNotEmpty())
         {
             item.SpeedVal = result.Speed ?? string.Empty;
+        }
+        if (result.Availability.IsNotEmpty())
+        {
+            item.Availability = result.Availability;
         }
         await Task.CompletedTask;
     }

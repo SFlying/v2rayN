@@ -26,6 +26,7 @@ public partial class MainWindow
         menuClose.Click += MenuClose_Click;
         menuCheckUpdate.Click += MenuCheckUpdate_Click;
         menuBackupAndRestore.Click += MenuBackupAndRestore_Click;
+        menuAvailabilityTesting.Click += menuAvailabilityTesting_Click;
 
         ViewModel = new MainWindowViewModel(UpdateViewHandler);
 
@@ -369,6 +370,13 @@ public partial class MainWindow
     {
         _backupAndRestoreView ??= new BackupAndRestoreView();
         DialogHost.Show(_backupAndRestoreView, "RootDialog");
+    }
+
+    private void menuAvailabilityTesting_Click(object sender, RoutedEventArgs e)
+    {
+        var win = new SpeedTestUrlWindow();
+        win.Owner = this; // 设置所有者，使其居中显示并随主窗体关闭
+        win.ShowDialog();
     }
 
     #endregion Event

@@ -142,6 +142,14 @@ public class ProfileExManager
         IndexIdEnqueue(indexId);
     }
 
+    public void SetTestAvailability(string indexId, string availability)
+    {
+        var profileEx = GetProfileExItem(indexId);
+
+        profileEx.Availability = availability;
+        IndexIdEnqueue(indexId);
+    }
+
     public void SetTestMessage(string indexId, string message)
     {
         var profileEx = GetProfileExItem(indexId);

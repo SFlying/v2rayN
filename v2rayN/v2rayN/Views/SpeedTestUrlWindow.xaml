@@ -1,0 +1,129 @@
+<base:WindowBase
+    x:Class="v2rayN.Views.SpeedTestUrlWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:base="clr-namespace:v2rayN.Base"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:reactiveui="http://reactiveui.net"
+    xmlns:resx="clr-namespace:ServiceLib.Resx;assembly=ServiceLib"
+    xmlns:vms="clr-namespace:ServiceLib.ViewModels;assembly=ServiceLib"
+    Title="可用性检测站点设置"
+    Width="900"
+    Height="600"
+    x:TypeArguments="vms:AvailabilityTargetViewModel"
+    ResizeMode="CanResize"
+    ShowInTaskbar="False"
+    Style="{StaticResource WindowGlobal}"
+    WindowStartupLocation="CenterScreen"
+    mc:Ignorable="d">
+    <materialDesign:DialogHost
+        materialDesign:TransitionAssist.DisableTransitions="True"
+        CloseOnClickAway="True"
+        Identifier="SpeedTestDialog"
+        Style="{StaticResource MaterialDesignEmbeddedDialogHost}">
+        <DockPanel>
+            <ToolBarTray DockPanel.Dock="Top">
+                <ToolBar
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Center"
+                    ClipToBounds="True"
+                    Style="{StaticResource MaterialDesignToolBar}">
+                    <Button x:Name="menuAdd">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon
+                                Margin="{StaticResource MarginRight8}"
+                                VerticalAlignment="Center"
+                                Kind="Plus" />
+                            <TextBlock Style="{StaticResource ToolbarTextBlock}" Text="{x:Static resx:ResUI.menuSubAdd}" />
+                        </StackPanel>
+                    </Button>
+                    <Separator />
+                    <Button x:Name="menuDelete">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon
+                                Margin="{StaticResource MarginRight8}"
+                                VerticalAlignment="Center"
+                                Kind="Delete" />
+                            <TextBlock Style="{StaticResource ToolbarTextBlock}" Text="{x:Static resx:ResUI.menuSubDelete}" />
+                        </StackPanel>
+                    </Button>
+                    <Separator />
+                    <Button x:Name="menuEdit">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon
+                                Margin="{StaticResource MarginRight8}"
+                                VerticalAlignment="Center"
+                                Kind="Edit" />
+                            <TextBlock Style="{StaticResource ToolbarTextBlock}" Text="{x:Static resx:ResUI.menuSubEdit}" />
+                        </StackPanel>
+                    </Button>
+                    <Separator />
+                    <Button x:Name="menuClose" IsCancel="True">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon
+                                Margin="{StaticResource MarginRight8}"
+                                VerticalAlignment="Center"
+                                Kind="Check" />
+                            <TextBlock Style="{StaticResource ToolbarTextBlock}" Text="确认并保存" />
+                        </StackPanel>
+                    </Button>
+                </ToolBar>
+            </ToolBarTray>
+
+            <DataGrid
+                x:Name="lstSpeedTestUrls"
+                AutoGenerateColumns="False"
+                BorderThickness="1"
+                CanUserAddRows="False"
+                CanUserResizeRows="False"
+                CanUserSortColumns="True"
+                EnableRowVirtualization="True"
+                GridLinesVisibility="All"
+                HeadersVisibility="Column"
+                IsReadOnly="True"
+                ItemsSource="{Binding SpeedTestItems}"
+                Style="{StaticResource DefDataGrid}">
+                <DataGrid.ContextMenu>
+                    <ContextMenu Style="{StaticResource DefContextMenu}">
+                        <MenuItem x:Name="menuAdd2" Header="{x:Static resx:ResUI.menuSubAdd}" />
+                        <MenuItem x:Name="menuDelete2" Header="{x:Static resx:ResUI.menuSubDelete}" />
+                        <MenuItem x:Name="menuEdit2" Header="{x:Static resx:ResUI.menuSubEdit}" />
+                    </ContextMenu>
+                </DataGrid.ContextMenu>
+                <DataGrid.Columns>
+                    <DataGridTextColumn
+                        Width="120"
+                        Binding="{Binding DestinationName}"
+                        Header="站点名称" />
+
+                    <DataGridTextColumn
+                        Width="*"
+                        Binding="{Binding TestUrl}"
+                        Header="检测地址" />
+
+                    <DataGridCheckBoxColumn
+                        Width="80"
+                        Binding="{Binding IsEnabled}"
+                        Header="启用" />
+
+                    <DataGridTextColumn
+                        Width="150"
+                        Binding="{Binding SuccessKeywords}"
+                        Header="成功特征码" />
+
+                    <DataGridTextColumn
+                        Width="150"
+                        Binding="{Binding UserAgent}"
+                        Header="自定义 User-Agent" />
+
+                    <DataGridTextColumn
+                        Width="60"
+                        Binding="{Binding Sort}"
+                        Header="{x:Static resx:ResUI.LvSort}" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </DockPanel>
+    </materialDesign:DialogHost>
+</base:WindowBase>

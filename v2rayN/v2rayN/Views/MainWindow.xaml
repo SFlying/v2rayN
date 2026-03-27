@@ -197,6 +197,10 @@
                                     x:Name="menuGlobalHotkeySetting"
                                     Height="{StaticResource MenuItemHeight}"
                                     Header="{x:Static resx:ResUI.menuGlobalHotkeySetting}" />
+                                <MenuItem
+                                    x:Name="menuAvailabilityTesting"
+                                    Height="{StaticResource MenuItemHeight}"
+                                    Header="可用性检测设置" />
                                 <Separator Margin="-40,5" />
                                 <MenuItem
                                     x:Name="menuRebootAsAdmin"
